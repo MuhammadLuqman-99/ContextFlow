@@ -43,6 +43,7 @@ export interface Microservice {
   next_steps: string[]
   health_status: 'Healthy' | 'Stale' | 'Inactive' | 'Unknown'
   last_commit_date: string | null
+  dependencies?: string[]
   created_at: string
   updated_at: string
 }
@@ -147,3 +148,26 @@ export interface HealthCheckSummary {
   unknown: number
   results: HealthCheckResult[]
 }
+
+/**
+ * Generated Task - derived from nextSteps of completed microservices
+ * These are virtual tasks that appear in Backlog, derived from "Done" services
+ */
+export interface GeneratedTask {
+  id: string // Generated: `${source_microservice_id}-${step_index}`
+  title: string // The next step text
+  source_microservice_id: string
+  source_service_name: string
+  source_manifest_path: string
+  step_index: number
+  status: 'Backlog' // Always starts as Backlog
+  is_generated: true // Flag to identify this as a generated task
+  created_from_status: 'Done' // The status of the source when this was generated
+}
+
+/**
+ * Union type for items that can appear in the Kanban board
+ */
+export type KanbanItem =
+  | (Microservice & { is_generated?: false; pending_suggestions?: number })
+  | GeneratedTask

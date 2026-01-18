@@ -5,9 +5,24 @@ import { verifyWebhookSignature, parsePushEvent, getWebhookEventType, createPing
 import { parseGitHubCommit, createManifestSuggestion, getAffectedManifests } from '@/lib/github/commit-parser'
 import { createOctokitClient } from '@/lib/github/octokit'
 import { readManifestFromGitHub } from '@/lib/github/manifest-reader'
+import { rateLimit, getClientIdentifier, rateLimitConfigs, createRateLimitHeaders } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting for webhooks
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = rateLimit(clientId, rateLimitConfigs.webhook)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many webhook requests' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimitResult),
+        }
+      )
+    }
+
     // Get webhook event type
     const eventType = getWebhookEventType(request.headers.get('x-github-event'))
 

@@ -14,10 +14,10 @@ export async function readManifestFromGitHub(
   try {
     const file = await getFileContent(octokit, owner, repo, path)
 
-    if (!file) {
+    if (!file.success || !file.content) {
       return {
         success: false,
-        error: `File not found: ${path}`,
+        error: file.error || `File not found: ${path}`,
       }
     }
 
@@ -126,7 +126,7 @@ export async function updateManifestOnGitHub(
       path,
       message,
       content: Buffer.from(content).toString('base64'),
-      sha: currentFile?.sha,
+      sha: currentFile.success ? currentFile.sha : undefined,
     })
 
     return { success: true }

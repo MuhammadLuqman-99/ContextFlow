@@ -42,7 +42,7 @@ export async function getFileContent(
   repo: string,
   path: string,
   ref?: string
-) {
+): Promise<{ success: boolean; content?: string; sha?: string; path?: string; error?: string }> {
   try {
     const { data } = await octokit.rest.repos.getContent({
       owner,
@@ -56,18 +56,19 @@ export async function getFileContent(
       // Decode base64 content
       const content = Buffer.from(data.content, 'base64').toString('utf-8')
       return {
+        success: true,
         content,
         sha: data.sha,
         path: data.path,
       }
     }
 
-    return null
+    return { success: false, error: 'Path is not a file' }
   } catch (error: any) {
     if (error.status === 404) {
-      return null
+      return { success: false, error: 'File not found' }
     }
-    throw error
+    return { success: false, error: error.message || 'Unknown error' }
   }
 }
 
@@ -189,6 +190,33 @@ export async function createOrUpdateFile(
   const { data } = await octokit.rest.repos.createOrUpdateFileContents(params)
 
   return data
+}
+
+/**
+ * Update file content in repository (with success/error response)
+ */
+export async function updateFileContent(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  path: string,
+  content: string,
+  message: string,
+  sha: string
+): Promise<{ success: boolean; sha?: string; error?: string }> {
+  try {
+    const data = await createOrUpdateFile(octokit, owner, repo, path, content, message, sha)
+    return {
+      success: true,
+      sha: data.commit.sha,
+    }
+  } catch (error: any) {
+    console.error('Error updating file:', error)
+    return {
+      success: false,
+      error: error.message || 'Failed to update file',
+    }
+  }
 }
 
 /**

@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Repository, Microservice } from '@/types/database'
+import { Repository, Microservice, GeneratedTask } from '@/types/database'
 import { Board, BoardSkeleton } from '@/components/kanban/Board'
 import { SuggestionList } from '@/components/suggestions/ManifestUpdateSuggestion'
 import { ConnectRepoModal } from '@/components/modals/ConnectRepoModal'
 import { ServiceDetailModal } from '@/components/modals/ServiceDetailModal'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ProjectOverview } from '@/components/dashboard/ProjectOverview'
 import { StatsView } from '@/components/dashboard/StatsView'
 import { TimelineView } from '@/components/dashboard/TimelineView'
+import { BlueprintView } from '@/components/dashboard/BlueprintView'
 import { Plus, RefreshCw, Github } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -36,6 +38,7 @@ export default function DashboardPage() {
   const [selectedService, setSelectedService] = useState<(Microservice & { pending_suggestions?: number }) | null>(null)
   const [activeTab, setActiveTab] = useState('kanban')
   const [searchQuery, setSearchQuery] = useState('')
+  const [dismissedTasks, setDismissedTasks] = useState<Set<string>>(new Set())
 
   // Helper for authenticated API calls
   const authFetch = async (url: string, options: RequestInit = {}) => {
@@ -220,6 +223,50 @@ export default function DashboardPage() {
     setSearchQuery(query)
   }
 
+  // Handle promoting a next step to "In Progress"
+  // This updates the source vibe.json to move the step from nextSteps to currentTask
+  const handlePromoteTask = async (task: GeneratedTask) => {
+    if (!selectedRepo) return
+
+    try {
+      // Find the source microservice
+      const sourceMicroservice = microservices.find(ms => ms.id === task.source_microservice_id)
+      if (!sourceMicroservice) {
+        toast.error('Source service not found')
+        return
+      }
+
+      // Create an API call to update the manifest
+      // This will update the vibe.json on GitHub
+      const response = await authFetch(`/api/manifests/${sourceMicroservice.id}/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskTitle: task.title,
+          stepIndex: task.step_index,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(`Started working on: ${task.title}`)
+        await loadMicroservices(selectedRepo.id)
+      } else {
+        toast.error(data.error || 'Failed to promote task')
+      }
+    } catch (error) {
+      console.error('Failed to promote task:', error)
+      toast.error('Failed to promote task')
+    }
+  }
+
+  // Handle dismissing a next step (hide it from the board)
+  const handleDismissTask = (task: GeneratedTask) => {
+    setDismissedTasks(prev => new Set([...prev, task.id]))
+    toast.success('Task dismissed from backlog')
+  }
+
   // Filter microservices based on search
   const filteredMicroservices = searchQuery
     ? microservices.filter(m =>
@@ -228,33 +275,81 @@ export default function DashboardPage() {
       )
     : microservices
 
+  // Filter out dismissed next steps from microservices
+  // We modify the next_steps array to exclude dismissed tasks
+  const microservicesWithFilteredNextSteps = filteredMicroservices.map(ms => {
+    if (ms.status === 'Done' && ms.next_steps && ms.next_steps.length > 0) {
+      const filteredNextSteps = ms.next_steps.filter((_, index) => {
+        const taskId = `${ms.id}-next-${index}`
+        return !dismissedTasks.has(taskId)
+      })
+      return { ...ms, next_steps: filteredNextSteps }
+    }
+    return ms
+  })
+
   if (loading && repositories.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 p-8">
-        <BoardSkeleton />
+      <div className="h-screen flex bg-slate-50 dark:bg-slate-900">
+        <Sidebar
+          user={user?.user_metadata || null}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSignOut={handleSignOut}
+        />
+        <div className="flex-1 p-6">
+          <BoardSkeleton />
+        </div>
       </div>
     )
   }
 
   const pendingSuggestionsCount = suggestions.length
 
+  // Transform suggestions into notifications format
+  const notifications = suggestions.map((s: any) => ({
+    id: s.id,
+    type: 'suggestion' as const,
+    title: `Update suggested for ${s.service_name || 'service'}`,
+    message: s.commit_message || 'A manifest update is available based on recent commits',
+    timestamp: s.created_at || new Date().toISOString(),
+    microservice_id: s.microservice_id,
+    service_name: s.service_name,
+  }))
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* New Header with Navigation */}
-      <DashboardHeader
+    <div className="h-screen flex bg-slate-50 dark:bg-slate-900 transition-colors overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar
         user={user?.user_metadata || null}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSearch={handleSearch}
-        onAddRepo={() => setShowConnectModal(true)}
-        onRefresh={handleRefresh}
         onSignOut={handleSignOut}
-        isRefreshing={loading}
-        notificationCount={pendingSuggestionsCount}
       />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Simplified Header */}
+        <DashboardHeader
+          user={user?.user_metadata || null}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSearch={handleSearch}
+          onAddRepo={() => setShowConnectModal(true)}
+          onRefresh={handleRefresh}
+          onSignOut={handleSignOut}
+          isRefreshing={loading}
+          notificationCount={pendingSuggestionsCount}
+          notifications={notifications}
+          onApplyNotification={handleApplySuggestion}
+          onDismissNotification={handleDismissSuggestion}
+          repositories={repositories}
+          selectedRepo={selectedRepo}
+          onSelectRepo={setSelectedRepo}
+        />
+
+        {/* Main Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto px-6 py-4">
         {repositories.length === 0 ? (
           /* Empty State */
           <div className="text-center py-16">
@@ -275,30 +370,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* Repository Selector (for multiple repos) */}
-            {repositories.length > 1 && (
-              <div className="mb-6 flex items-center gap-4">
-                <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Repository:</label>
-                <select
-                  value={selectedRepo?.id || ''}
-                  onChange={(e) => {
-                    const repo = repositories.find(r => r.id === e.target.value)
-                    setSelectedRepo(repo || null)
-                  }}
-                  className="border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                >
-                  {repositories.map((repo) => (
-                    <option key={repo.id} value={repo.id}>
-                      {repo.full_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* Tab Content */}
             {activeTab === 'kanban' && (
-              <div>
+              <div className="space-y-4">
                 {/* Project Overview Stats */}
                 <ProjectOverview
                   repositories={repositories}
@@ -307,9 +381,10 @@ export default function DashboardPage() {
                   selectedRepoId={selectedRepo?.id}
                 />
 
-                <div className="flex items-center justify-between mb-6">
+                {/* Header row */}
+                <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                       {selectedRepo?.full_name}
                     </h2>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -319,31 +394,47 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {filteredMicroservices.length === 0 ? (
-                  <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600">
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
-                      {searchQuery ? 'No services match your search' : 'No services found'}
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-400 mb-6">
-                      {searchQuery
-                        ? 'Try adjusting your search query'
-                        : <>Add <code className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">vibe.json</code> files to your repository, then click refresh to start tracking.</>
-                      }
-                    </p>
-                    {!searchQuery && (
-                      <button
-                        onClick={handleRefresh}
-                        className="btn-primary flex items-center gap-2 mx-auto"
-                      >
-                        <RefreshCw size={16} />
-                        Scan Repository
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <Board microservices={filteredMicroservices} onCardClick={setSelectedService} />
-                )}
+                {/* Board Container */}
+                <div>
+                  {filteredMicroservices.length === 0 ? (
+                    <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600">
+                      <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                        {searchQuery ? 'No services match your search' : 'No services found'}
+                      </h3>
+                      <p className="text-slate-600 dark:text-slate-400 mb-6">
+                        {searchQuery
+                          ? 'Try adjusting your search query'
+                          : <>Add <code className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">vibe.json</code> files to your repository, then click refresh to start tracking.</>
+                        }
+                      </p>
+                      {!searchQuery && (
+                        <button
+                          onClick={handleRefresh}
+                          className="btn-primary flex items-center gap-2 mx-auto"
+                        >
+                          <RefreshCw size={16} />
+                          Scan Repository
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <Board
+                      microservices={microservicesWithFilteredNextSteps}
+                      onCardClick={setSelectedService}
+                      onPromoteTask={handlePromoteTask}
+                      onDismissTask={handleDismissTask}
+                    />
+                  )}
+                </div>
               </div>
+            )}
+
+            {activeTab === 'blueprint' && (
+              <BlueprintView
+                microservices={filteredMicroservices}
+                repoFullName={selectedRepo?.full_name}
+                repoId={selectedRepo?.id}
+              />
             )}
 
             {activeTab === 'stats' && (
@@ -405,7 +496,8 @@ export default function DashboardPage() {
             )}
           </>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Connect Repository Modal */}
       <ConnectRepoModal
