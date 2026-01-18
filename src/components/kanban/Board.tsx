@@ -48,9 +48,9 @@ export function BoardSkeleton() {
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex-1 min-w-[280px]">
           <div className="animate-pulse">
-            <div className="h-8 bg-slate-200 rounded mb-4 w-32" />
-            <div className="kanban-column">
-              <div className="kanban-card h-40 bg-slate-100" />
+            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4 w-32" />
+            <div className="kanban-column dark:bg-slate-800/50">
+              <div className="kanban-card h-40 bg-slate-100 dark:bg-slate-700" />
             </div>
           </div>
         </div>

@@ -8,24 +8,28 @@
     --foreground: 222.2 84% 4.9%;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors;
   }
 }
 
 @layer components {
   /* Kanban Board Styles */
   .kanban-column {
-    @apply bg-slate-100 rounded-lg p-4 min-h-[500px];
+    @apply bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4 min-h-[500px] transition-colors;
   }
 
   .kanban-card {
-    @apply bg-white rounded-lg shadow-sm p-4 mb-3 border border-slate-200 hover:shadow-md transition-shadow cursor-pointer;
+    @apply bg-white dark:bg-slate-800 rounded-lg shadow-sm p-4 mb-3 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all cursor-pointer;
   }
 
   .kanban-card-dragging {
@@ -47,7 +51,7 @@
 
   /* Progress Bar */
   .progress-bar {
-    @apply w-full bg-slate-200 rounded-full h-2 overflow-hidden;
+    @apply w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden;
   }
 
   .progress-fill {
@@ -60,7 +64,7 @@
   }
 
   .btn-secondary {
-    @apply bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-medium py-2 px-4 rounded-lg transition-colors;
   }
 
   .btn-success {

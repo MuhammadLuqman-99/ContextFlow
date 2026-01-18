@@ -72,7 +72,7 @@ export async function getFileContent(
 }
 
 /**
- * Search for files in repository
+ * Search for files in repository using Git Tree API (instant, no indexing delay)
  */
 export async function searchFilesInRepo(
   octokit: Octokit,
@@ -80,14 +80,29 @@ export async function searchFilesInRepo(
   repo: string,
   filename: string
 ) {
-  const query = `filename:${filename} repo:${owner}/${repo}`
+  try {
+    // Get the default branch
+    const { data: repoData } = await octokit.rest.repos.get({ owner, repo })
+    const defaultBranch = repoData.default_branch
 
-  const { data } = await octokit.rest.search.code({
-    q: query,
-    per_page: 100,
-  })
+    // Get the tree recursively
+    const { data: tree } = await octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: defaultBranch,
+      recursive: 'true',
+    })
 
-  return data.items
+    // Filter for files matching the filename
+    const matchingFiles = tree.tree
+      .filter(item => item.type === 'blob' && item.path?.endsWith(filename))
+      .map(item => ({ path: item.path!, sha: item.sha! }))
+
+    return matchingFiles
+  } catch (error) {
+    console.error('Error searching files in repo:', error)
+    return []
+  }
 }
 
 /**

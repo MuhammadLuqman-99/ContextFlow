@@ -28,12 +28,12 @@ export function Column({ title, status, microservices, onCardClick }: ColumnProp
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-2">
           <div className={clsx('w-3 h-3 rounded-full', statusColors[status])} />
-          <h2 className="font-semibold text-slate-800 text-lg">{title}</h2>
-          <span className="bg-slate-200 text-slate-700 text-xs font-medium px-2 py-0.5 rounded-full">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-200 text-lg">{title}</h2>
+          <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium px-2 py-0.5 rounded-full">
             {count}
           </span>
         </div>
-        <div className="h-1 bg-slate-200 rounded-full">
+        <div className="h-1 bg-slate-200 dark:bg-slate-700 rounded-full">
           <div
             className={clsx('h-full rounded-full transition-all', statusColors[status])}
             style={{ width: count > 0 ? '100%' : '0%' }}

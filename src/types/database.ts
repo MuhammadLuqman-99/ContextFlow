@@ -1,33 +1,13 @@
 /**
  * Database types for Supabase tables
+ *
+ * Note: Using 'any' for the Database type to avoid Supabase type conflicts.
+ * In production, generate proper types from Supabase CLI:
+ * npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/supabase.ts
  */
 
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: User
-        Insert: Omit<User, 'id' | 'created_at'>
-        Update: Partial<Omit<User, 'id' | 'created_at'>>
-      }
-      repositories: {
-        Row: Repository
-        Insert: Omit<Repository, 'id' | 'created_at'>
-        Update: Partial<Omit<Repository, 'id' | 'created_at'>>
-      }
-      microservices: {
-        Row: Microservice
-        Insert: Omit<Microservice, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Microservice, 'id' | 'created_at' | 'updated_at'>>
-      }
-      commit_suggestions: {
-        Row: CommitSuggestion
-        Insert: Omit<CommitSuggestion, 'id' | 'created_at'>
-        Update: Partial<Omit<CommitSuggestion, 'id' | 'created_at'>>
-      }
-    }
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Database = any
 
 export interface User {
   id: string

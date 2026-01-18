@@ -89,36 +89,36 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden m-4">
+      <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden m-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="bg-primary-100 p-2 rounded-lg">
-              <Github className="text-primary-600" size={24} />
+            <div className="bg-primary-100 dark:bg-primary-900/30 p-2 rounded-lg">
+              <Github className="text-primary-600 dark:text-primary-400" size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-slate-800">Connect Repository</h2>
-              <p className="text-sm text-slate-500">Select a repository to track with ContextFlow</p>
+              <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">Connect Repository</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Select a repository to track with ContextFlow</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
-            <X size={20} className="text-slate-500" />
+            <X size={20} className="text-slate-500 dark:text-slate-400" />
           </button>
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Search repositories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -128,11 +128,11 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-primary-500" size={32} />
-              <span className="ml-3 text-slate-600">Loading repositories...</span>
+              <span className="ml-3 text-slate-600 dark:text-slate-400">Loading repositories...</span>
             </div>
           ) : error ? (
             <div className="text-center py-12">
-              <p className="text-red-500 mb-4">{error}</p>
+              <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
               <button
                 onClick={loadAvailableRepos}
                 className="btn-secondary"
@@ -141,7 +141,7 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
               </button>
             </div>
           ) : filteredRepos.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
+            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
               {searchQuery
                 ? 'No repositories match your search'
                 : 'No repositories available to connect'}
@@ -154,23 +154,23 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
                   className={clsx(
                     'flex items-center justify-between p-4 rounded-lg border transition-all',
                     connecting === repo.full_name
-                      ? 'border-primary-300 bg-primary-50'
-                      : 'border-slate-200 hover:border-primary-300 hover:bg-slate-50'
+                      ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                   )}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-800 truncate">
+                      <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
                         {repo.full_name}
                       </span>
                       {repo.private ? (
-                        <Lock size={14} className="text-slate-400 flex-shrink-0" />
+                        <Lock size={14} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
                       ) : (
-                        <Unlock size={14} className="text-slate-400 flex-shrink-0" />
+                        <Unlock size={14} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
                       )}
                     </div>
                     {repo.description && (
-                      <p className="text-sm text-slate-500 truncate mt-1">
+                      <p className="text-sm text-slate-500 dark:text-slate-400 truncate mt-1">
                         {repo.description}
                       </p>
                     )}
@@ -182,7 +182,7 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
                       'ml-4 px-4 py-2 rounded-lg font-medium text-sm transition-colors flex-shrink-0',
                       connecting === repo.full_name
                         ? 'bg-primary-500 text-white'
-                        : 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                        : 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
                     )}
                   >
                     {connecting === repo.full_name ? (
@@ -201,9 +201,9 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-slate-50">
-          <p className="text-xs text-slate-500 text-center">
-            ContextFlow will scan for <code className="bg-slate-200 px-1 rounded">vibe.json</code> files
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+            ContextFlow will scan for <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">vibe.json</code> files
             and set up a webhook for real-time updates.
           </p>
         </div>

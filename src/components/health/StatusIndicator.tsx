@@ -12,7 +12,7 @@ export function StatusIndicator({ status, showLabel = true, size = 'md' }: Statu
     Healthy: 'bg-status-healthy text-white',
     Stale: 'bg-status-stale text-white',
     Inactive: 'bg-status-inactive text-white',
-    Unknown: 'bg-slate-400 text-white',
+    Unknown: 'bg-slate-400 dark:bg-slate-600 text-white',
   }
 
   const icons = {
@@ -64,7 +64,7 @@ export function HealthBadge({ status, lastCommitDate }: HealthBadgeProps) {
   return (
     <div className="flex items-center gap-2">
       <StatusIndicator status={status} showLabel={false} size="sm" />
-      <div className="text-xs text-slate-600">
+      <div className="text-xs text-slate-600 dark:text-slate-400">
         {lastCommitDate ? (
           <>Last commit: {getTimeAgo(lastCommitDate)}</>
         ) : (

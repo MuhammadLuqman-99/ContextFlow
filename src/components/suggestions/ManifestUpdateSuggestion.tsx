@@ -56,7 +56,7 @@ export function ManifestUpdateSuggestion({ suggestion, onApply, onDismiss }: Sug
   }
 
   return (
-    <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4 hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-start gap-3 flex-1">
@@ -64,10 +64,10 @@ export function ManifestUpdateSuggestion({ suggestion, onApply, onDismiss }: Sug
             <GitCommit size={16} className="text-white" />
           </div>
           <div className="flex-1">
-            <div className="font-medium text-slate-800 mb-1">
+            <div className="font-medium text-slate-800 dark:text-slate-200 mb-1">
               Suggestion for {suggestion.microservices?.service_name}
             </div>
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-slate-600 dark:text-slate-400">
               {suggestion.commit_message}
             </div>
           </div>
@@ -76,12 +76,12 @@ export function ManifestUpdateSuggestion({ suggestion, onApply, onDismiss }: Sug
 
       {/* Changes */}
       {changes.length > 0 && (
-        <div className="bg-white rounded-lg p-3 mb-3 border border-primary-100">
-          <div className="text-xs font-medium text-slate-500 mb-2">Detected Changes:</div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-3 mb-3 border border-primary-100 dark:border-primary-800">
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Detected Changes:</div>
           <ul className="space-y-1">
             {changes.map((change, index) => (
-              <li key={index} className="text-sm text-slate-700 flex items-center gap-2">
-                <span className="text-primary-500">→</span>
+              <li key={index} className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <span className="text-primary-500 dark:text-primary-400">→</span>
                 {change}
               </li>
             ))}
@@ -90,8 +90,8 @@ export function ManifestUpdateSuggestion({ suggestion, onApply, onDismiss }: Sug
       )}
 
       {/* Commit Info */}
-      <div className="text-xs text-slate-500 mb-3">
-        Commit: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono">{suggestion.commit_sha.slice(0, 7)}</code>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        Commit: <code className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded font-mono">{suggestion.commit_sha.slice(0, 7)}</code>
       </div>
 
       {/* Actions */}
@@ -138,7 +138,7 @@ interface SuggestionListProps {
 export function SuggestionList({ suggestions, onApply, onDismiss }: SuggestionListProps) {
   if (suggestions.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-500">
+      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
         No pending suggestions
       </div>
     )

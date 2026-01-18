@@ -345,7 +345,7 @@ export async function updateMicroserviceHealthStatus(
 
 export async function getAllMicroservicesForHealthCheck(
   client: TypedSupabaseClient
-) {
+): Promise<Array<Microservice & { repositories: { id: string; full_name: string; owner: string; repo_name: string; user_id: string } }>> {
   const { data, error } = await client
     .from('microservices')
     .select(`
@@ -354,10 +354,11 @@ export async function getAllMicroservicesForHealthCheck(
         id,
         full_name,
         owner,
-        repo_name
+        repo_name,
+        user_id
       )
     `)
 
   if (error) throw error
-  return data || []
+  return (data as any) || []
 }

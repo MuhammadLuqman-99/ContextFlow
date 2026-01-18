@@ -20,15 +20,17 @@ export async function POST(request: NextRequest) {
     // Use service role client to upsert user (bypasses RLS)
     const serviceClient = getServiceRoleClient()
 
+    const userData = {
+      id: userId,
+      github_id: githubUser.id.toString(),
+      github_username: githubUser.login,
+      avatar_url: githubUser.avatar_url,
+      access_token: providerToken,
+    }
+
     const { error } = await serviceClient
       .from('users')
-      .upsert({
-        id: userId,
-        github_id: githubUser.id.toString(),
-        github_username: githubUser.login,
-        avatar_url: githubUser.avatar_url,
-        access_token: providerToken,
-      }, {
+      .upsert(userData as any, {
         onConflict: 'github_id'
       })
 

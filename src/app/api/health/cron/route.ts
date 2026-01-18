@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
           .from('users')
           .select('access_token')
           .eq('id', ms.repositories.user_id)
-          .single()
+          .single() as { data: { access_token: string } | null }
 
         if (!userData?.access_token) {
           errors.push({
@@ -97,9 +97,11 @@ export async function POST(request: NextRequest) {
         let lastCommitDate: string | null = null
 
         if (latestCommit) {
-          lastCommitDate = latestCommit.commit.author.date
-          daysSinceCommit = daysSince(lastCommitDate)
-          newStatus = calculateHealthStatus(daysSinceCommit)
+          lastCommitDate = latestCommit.commit.author?.date || null
+          if (lastCommitDate) {
+            daysSinceCommit = daysSince(lastCommitDate)
+            newStatus = calculateHealthStatus(daysSinceCommit)
+          }
         }
 
         // Update microservice health status

@@ -6,7 +6,12 @@ import { Repository, Microservice } from '@/types/database'
 import { Board, BoardSkeleton } from '@/components/kanban/Board'
 import { SuggestionList } from '@/components/suggestions/ManifestUpdateSuggestion'
 import { ConnectRepoModal } from '@/components/modals/ConnectRepoModal'
-import { Plus, RefreshCw, Github, LogOut } from 'lucide-react'
+import { ServiceDetailModal } from '@/components/modals/ServiceDetailModal'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { ProjectOverview } from '@/components/dashboard/ProjectOverview'
+import { StatsView } from '@/components/dashboard/StatsView'
+import { TimelineView } from '@/components/dashboard/TimelineView'
+import { Plus, RefreshCw, Github } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -25,10 +30,12 @@ export default function DashboardPage() {
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null)
   const [microservices, setMicroservices] = useState<Array<Microservice & { pending_suggestions?: number }>>([])
   const [suggestions, setSuggestions] = useState<any[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [selectedService, setSelectedService] = useState<(Microservice & { pending_suggestions?: number }) | null>(null)
+  const [activeTab, setActiveTab] = useState('kanban')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Helper for authenticated API calls
   const authFetch = async (url: string, options: RequestInit = {}) => {
@@ -77,7 +84,6 @@ export default function DashboardPage() {
           setSelectedRepo(data.data[0])
         }
       } else if (response.status === 401) {
-        // Session might have expired, try to refresh
         router.push('/login')
       }
     } catch (error) {
@@ -123,7 +129,7 @@ export default function DashboardPage() {
 
     setLoading(true)
     try {
-      const response = await fetch('/api/manifests/scan', {
+      const response = await authFetch('/api/manifests/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoId: selectedRepo.id }),
@@ -210,6 +216,18 @@ export default function DashboardPage() {
     router.push('/')
   }
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
+  }
+
+  // Filter microservices based on search
+  const filteredMicroservices = searchQuery
+    ? microservices.filter(m =>
+        m.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.current_task.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : microservices
+
   if (loading && repositories.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 p-8">
@@ -221,98 +239,30 @@ export default function DashboardPage() {
   const pendingSuggestionsCount = suggestions.length
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-                ContextFlow
-              </h1>
-
-              {/* Repository Selector */}
-              {repositories.length > 0 && (
-                <select
-                  value={selectedRepo?.id || ''}
-                  onChange={(e) => {
-                    const repo = repositories.find(r => r.id === e.target.value)
-                    setSelectedRepo(repo || null)
-                  }}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {repositories.map((repo) => (
-                    <option key={repo.id} value={repo.id}>
-                      {repo.full_name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* Add Repo Button */}
-              <button
-                onClick={() => setShowConnectModal(true)}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Add Repo
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Suggestions Badge */}
-              {pendingSuggestionsCount > 0 && (
-                <button
-                  onClick={() => setShowSuggestions(!showSuggestions)}
-                  className="relative btn-secondary flex items-center gap-2"
-                >
-                  <span>Suggestions</span>
-                  <span className="bg-primary-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                    {pendingSuggestionsCount}
-                  </span>
-                </button>
-              )}
-
-              {/* Refresh Button */}
-              <button
-                onClick={handleRefresh}
-                disabled={loading || !selectedRepo}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                Scan Repo
-              </button>
-
-              {/* User Menu */}
-              <div className="flex items-center gap-2 pl-2 border-l">
-                <img
-                  src={user?.user_metadata?.avatar_url || '/default-avatar.png'}
-                  alt="Avatar"
-                  className="w-8 h-8 rounded-full"
-                />
-                <button
-                  onClick={handleSignOut}
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
+      {/* New Header with Navigation */}
+      <DashboardHeader
+        user={user?.user_metadata || null}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onSearch={handleSearch}
+        onAddRepo={() => setShowConnectModal(true)}
+        onRefresh={handleRefresh}
+        onSignOut={handleSignOut}
+        isRefreshing={loading}
+        notificationCount={pendingSuggestionsCount}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         {repositories.length === 0 ? (
           /* Empty State */
           <div className="text-center py-16">
-            <Github size={64} className="mx-auto mb-4 text-slate-300" />
-            <h2 className="text-2xl font-semibold text-slate-800 mb-2">
+            <Github size={64} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+            <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-2">
               No repositories connected
             </h2>
-            <p className="text-slate-600 mb-6">
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
               Connect a GitHub repository to start tracking your microservices
             </p>
             <button
@@ -323,62 +273,137 @@ export default function DashboardPage() {
               Connect Repository
             </button>
           </div>
-        ) : showSuggestions ? (
-          /* Suggestions View */
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-slate-800">
-                Pending Suggestions ({pendingSuggestionsCount})
-              </h2>
-              <button
-                onClick={() => setShowSuggestions(false)}
-                className="btn-secondary"
-              >
-                Back to Board
-              </button>
-            </div>
-
-            <SuggestionList
-              suggestions={suggestions}
-              onApply={handleApplySuggestion}
-              onDismiss={handleDismissSuggestion}
-            />
-          </div>
         ) : (
-          /* Kanban Board */
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-800">
-                  {selectedRepo?.full_name}
-                </h2>
-                <p className="text-sm text-slate-600">
-                  {microservices.length} service{microservices.length !== 1 ? 's' : ''} tracked
-                </p>
-              </div>
-            </div>
-
-            {microservices.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-lg border-2 border-dashed border-slate-300">
-                <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                  No services found
-                </h3>
-                <p className="text-slate-600 mb-6">
-                  Add <code className="bg-slate-100 px-2 py-1 rounded">vibe.json</code> files to your repository,
-                  then click "Scan Repo" to start tracking.
-                </p>
-                <button
-                  onClick={handleRefresh}
-                  className="btn-primary flex items-center gap-2 mx-auto"
+          <>
+            {/* Repository Selector (for multiple repos) */}
+            {repositories.length > 1 && (
+              <div className="mb-6 flex items-center gap-4">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Repository:</label>
+                <select
+                  value={selectedRepo?.id || ''}
+                  onChange={(e) => {
+                    const repo = repositories.find(r => r.id === e.target.value)
+                    setSelectedRepo(repo || null)
+                  }}
+                  className="border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                 >
-                  <RefreshCw size={16} />
-                  Scan Repository
-                </button>
+                  {repositories.map((repo) => (
+                    <option key={repo.id} value={repo.id}>
+                      {repo.full_name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <Board microservices={microservices} />
             )}
-          </div>
+
+            {/* Tab Content */}
+            {activeTab === 'kanban' && (
+              <div>
+                {/* Project Overview Stats */}
+                <ProjectOverview
+                  repositories={repositories}
+                  microservices={filteredMicroservices}
+                  onSelectRepo={setSelectedRepo}
+                  selectedRepoId={selectedRepo?.id}
+                />
+
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+                      {selectedRepo?.full_name}
+                    </h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {filteredMicroservices.length} service{filteredMicroservices.length !== 1 ? 's' : ''} tracked
+                      {searchQuery && ` (filtered)`}
+                    </p>
+                  </div>
+                </div>
+
+                {filteredMicroservices.length === 0 ? (
+                  <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600">
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                      {searchQuery ? 'No services match your search' : 'No services found'}
+                    </h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-6">
+                      {searchQuery
+                        ? 'Try adjusting your search query'
+                        : <>Add <code className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">vibe.json</code> files to your repository, then click refresh to start tracking.</>
+                      }
+                    </p>
+                    {!searchQuery && (
+                      <button
+                        onClick={handleRefresh}
+                        className="btn-primary flex items-center gap-2 mx-auto"
+                      >
+                        <RefreshCw size={16} />
+                        Scan Repository
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <Board microservices={filteredMicroservices} onCardClick={setSelectedService} />
+                )}
+              </div>
+            )}
+
+            {activeTab === 'stats' && (
+              <StatsView microservices={filteredMicroservices} />
+            )}
+
+            {activeTab === 'timeline' && (
+              <TimelineView
+                microservices={filteredMicroservices}
+                onServiceClick={setSelectedService}
+              />
+            )}
+
+            {activeTab === 'settings' && (
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 transition-colors">
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-6">Settings</h2>
+
+                {/* Repository Settings */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Connected Repositories</h3>
+                    <div className="space-y-3">
+                      {repositories.map((repo) => (
+                        <div key={repo.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                          <div>
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{repo.full_name}</div>
+                            <div className="text-sm text-slate-500 dark:text-slate-400">Connected on {new Date(repo.created_at).toLocaleDateString()}</div>
+                          </div>
+                          <button className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium">
+                            Disconnect
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Notifications</h3>
+                    <label className="flex items-center gap-3">
+                      <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-primary-600 focus:ring-primary-500 dark:bg-slate-700" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">Email me when a service status changes</span>
+                    </label>
+                  </div>
+
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Pending Suggestions ({pendingSuggestionsCount})</h3>
+                    {pendingSuggestionsCount > 0 ? (
+                      <SuggestionList
+                        suggestions={suggestions}
+                        onApply={handleApplySuggestion}
+                        onDismiss={handleDismissSuggestion}
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">No pending suggestions</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -387,6 +412,14 @@ export default function DashboardPage() {
         isOpen={showConnectModal}
         onClose={() => setShowConnectModal(false)}
         onConnect={handleConnectRepo}
+      />
+
+      {/* Service Detail Modal */}
+      <ServiceDetailModal
+        isOpen={!!selectedService}
+        onClose={() => setSelectedService(null)}
+        service={selectedService}
+        repoFullName={selectedRepo?.full_name}
       />
     </div>
   )
