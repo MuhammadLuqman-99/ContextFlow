@@ -59,9 +59,11 @@ export const Hero = () => {
                             Start Vibe Coding <Zap className="w-4 h-4 fill-current" />
                         </button>
                     </Link>
-                    <button className="px-8 py-4 bg-white/5 text-white font-medium rounded-full border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-sm">
-                        View Live Demo
-                    </button>
+                    <Link href="/demo">
+                        <button className="px-8 py-4 bg-white/5 text-white font-medium rounded-full border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-sm">
+                            View Live Demo
+                        </button>
+                    </Link>
                 </motion.div>
 
                 {/* Dashboard Mockup */}

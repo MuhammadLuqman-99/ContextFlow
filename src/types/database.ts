@@ -28,6 +28,7 @@ export interface Repository {
   webhook_id: number | null
   webhook_secret: string | null
   is_active: boolean
+  share_token: string | null
   created_at: string
 }
 
@@ -151,7 +152,7 @@ export interface HealthCheckSummary {
 
 /**
  * Generated Task - derived from nextSteps of completed microservices
- * These are virtual tasks that appear in Backlog, derived from "Done" services
+ * These are virtual tasks that appear in In Progress, derived from "Done" services
  */
 export interface GeneratedTask {
   id: string // Generated: `${source_microservice_id}-${step_index}`
@@ -160,7 +161,7 @@ export interface GeneratedTask {
   source_service_name: string
   source_manifest_path: string
   step_index: number
-  status: 'Backlog' // Always starts as Backlog
+  status: 'Backlog' | 'In Progress' // Starts in In Progress
   is_generated: true // Flag to identify this as a generated task
   created_from_status: 'Done' // The status of the source when this was generated
 }

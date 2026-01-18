@@ -13,6 +13,9 @@ import { ProjectOverview } from '@/components/dashboard/ProjectOverview'
 import { StatsView } from '@/components/dashboard/StatsView'
 import { TimelineView } from '@/components/dashboard/TimelineView'
 import { BlueprintView } from '@/components/dashboard/BlueprintView'
+import { SettingsView } from '@/components/dashboard/SettingsView'
+import { ShareModal } from '@/components/dashboard/ShareModal'
+import { exportDashboardToPDF } from '@/lib/export/pdf'
 import { Plus, RefreshCw, Github } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -39,6 +42,9 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('kanban')
   const [searchQuery, setSearchQuery] = useState('')
   const [dismissedTasks, setDismissedTasks] = useState<Set<string>>(new Set())
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | undefined>(undefined)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Helper for authenticated API calls
   const authFetch = async (url: string, options: RequestInit = {}) => {
@@ -64,6 +70,76 @@ export default function DashboardPage() {
       loadSuggestions(selectedRepo.id)
     }
   }, [selectedRepo, accessToken])
+
+  // Real-time subscription to microservices changes
+  useEffect(() => {
+    if (!selectedRepo) return
+
+    const channel = supabase
+      .channel(`microservices-${selectedRepo.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'microservices',
+          filter: `repository_id=eq.${selectedRepo.id}`,
+        },
+        (payload) => {
+          console.log('Real-time update:', payload)
+
+          if (payload.eventType === 'INSERT') {
+            setMicroservices(prev => [...prev, payload.new as any])
+            toast.success(`New service added: ${(payload.new as any).service_name}`)
+          } else if (payload.eventType === 'UPDATE') {
+            setMicroservices(prev =>
+              prev.map(ms =>
+                ms.id === payload.new.id ? { ...ms, ...payload.new } : ms
+              )
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setMicroservices(prev => prev.filter(ms => ms.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedRepo])
+
+  // Real-time subscription to suggestions changes
+  useEffect(() => {
+    if (!selectedRepo) return
+
+    // Get microservice IDs for this repo
+    const msIds = microservices.map(ms => ms.id)
+    if (msIds.length === 0) return
+
+    const channel = supabase
+      .channel(`suggestions-${selectedRepo.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'commit_suggestions',
+        },
+        (payload) => {
+          // Check if this suggestion is for one of our microservices
+          if (msIds.includes((payload.new as any).microservice_id)) {
+            loadSuggestions(selectedRepo.id)
+            toast.info('New commit suggestion available!')
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedRepo, microservices])
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -214,6 +290,31 @@ export default function DashboardPage() {
     }
   }
 
+  const handleDisconnectRepo = async (repoId: string) => {
+    try {
+      const response = await authFetch(`/api/repos/${repoId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setRepositories(prev => prev.filter(r => r.id !== repoId))
+        if (selectedRepo?.id === repoId) {
+          setSelectedRepo(repositories.find(r => r.id !== repoId) || null)
+          setMicroservices([])
+          setSuggestions([])
+        }
+        toast.success('Repository disconnected')
+      } else {
+        toast.error(data.error || 'Failed to disconnect repository')
+      }
+    } catch (error) {
+      console.error('Failed to disconnect repository:', error)
+      toast.error('Failed to disconnect repository')
+    }
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
@@ -221,6 +322,86 @@ export default function DashboardPage() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
+  }
+
+  // Load share URL when repo changes
+  useEffect(() => {
+    if (selectedRepo && accessToken) {
+      loadShareUrl(selectedRepo.id)
+    } else {
+      setShareUrl(undefined)
+    }
+  }, [selectedRepo, accessToken])
+
+  const loadShareUrl = async (repoId: string) => {
+    try {
+      const response = await authFetch(`/api/repos/${repoId}/share`)
+      const data = await response.json()
+      if (data.success && data.data.share_url) {
+        setShareUrl(data.data.share_url)
+      } else {
+        setShareUrl(undefined)
+      }
+    } catch (error) {
+      console.error('Failed to load share URL:', error)
+      setShareUrl(undefined)
+    }
+  }
+
+  const handleGenerateShareLink = async (): Promise<string> => {
+    if (!selectedRepo) throw new Error('No repository selected')
+
+    const response = await authFetch(`/api/repos/${selectedRepo.id}/share`, {
+      method: 'POST',
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      setShareUrl(data.data.share_url)
+      return data.data.share_url
+    } else {
+      throw new Error(data.error || 'Failed to generate share link')
+    }
+  }
+
+  const handleRevokeShareLink = async (): Promise<void> => {
+    if (!selectedRepo) throw new Error('No repository selected')
+
+    const response = await authFetch(`/api/repos/${selectedRepo.id}/share`, {
+      method: 'DELETE',
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      setShareUrl(undefined)
+    } else {
+      throw new Error(data.error || 'Failed to revoke share link')
+    }
+  }
+
+  // Handle exporting dashboard to PDF
+  const handleExport = async () => {
+    if (!selectedRepo || microservices.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      await exportDashboardToPDF({
+        repository: selectedRepo,
+        microservices: microservices,
+        includeDetails: true,
+      })
+      toast.success('PDF exported successfully!')
+    } catch (error) {
+      console.error('Failed to export PDF:', error)
+      toast.error('Failed to export PDF')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // Handle promoting a next step to "In Progress"
@@ -265,6 +446,36 @@ export default function DashboardPage() {
   const handleDismissTask = (task: GeneratedTask) => {
     setDismissedTasks(prev => new Set([...prev, task.id]))
     toast.success('Task dismissed from backlog')
+  }
+
+  // Handle drag-and-drop status change
+  const handleStatusChange = async (microserviceId: string, newStatus: string) => {
+    try {
+      const response = await authFetch(`/api/manifests/${microserviceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update local state optimistically
+        setMicroservices(prev =>
+          prev.map(ms =>
+            ms.id === microserviceId
+              ? { ...ms, status: newStatus as any, last_update: new Date().toISOString() }
+              : ms
+          )
+        )
+        toast.success(`Moved to ${newStatus}`)
+      } else {
+        toast.error(data.error || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error)
+      toast.error('Failed to update status')
+    }
   }
 
   // Filter microservices based on search
@@ -338,6 +549,9 @@ export default function DashboardPage() {
           onAddRepo={() => setShowConnectModal(true)}
           onRefresh={handleRefresh}
           onSignOut={handleSignOut}
+          onShare={() => setShowShareModal(true)}
+          onExport={handleExport}
+          isExporting={isExporting}
           isRefreshing={loading}
           notificationCount={pendingSuggestionsCount}
           notifications={notifications}
@@ -423,6 +637,7 @@ export default function DashboardPage() {
                       onCardClick={setSelectedService}
                       onPromoteTask={handlePromoteTask}
                       onDismissTask={handleDismissTask}
+                      onStatusChange={handleStatusChange}
                     />
                   )}
                 </div>
@@ -449,50 +664,15 @@ export default function DashboardPage() {
             )}
 
             {activeTab === 'settings' && (
-              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 transition-colors">
-                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-6">Settings</h2>
-
-                {/* Repository Settings */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Connected Repositories</h3>
-                    <div className="space-y-3">
-                      {repositories.map((repo) => (
-                        <div key={repo.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                          <div>
-                            <div className="font-medium text-slate-800 dark:text-slate-200">{repo.full_name}</div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400">Connected on {new Date(repo.created_at).toLocaleDateString()}</div>
-                          </div>
-                          <button className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium">
-                            Disconnect
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Notifications</h3>
-                    <label className="flex items-center gap-3">
-                      <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-primary-600 focus:ring-primary-500 dark:bg-slate-700" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">Email me when a service status changes</span>
-                    </label>
-                  </div>
-
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                    <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Pending Suggestions ({pendingSuggestionsCount})</h3>
-                    {pendingSuggestionsCount > 0 ? (
-                      <SuggestionList
-                        suggestions={suggestions}
-                        onApply={handleApplySuggestion}
-                        onDismiss={handleDismissSuggestion}
-                      />
-                    ) : (
-                      <p className="text-sm text-slate-500 dark:text-slate-400">No pending suggestions</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <SettingsView
+                user={user ? { id: user.id, ...user.user_metadata } : null}
+                repositories={repositories}
+                suggestions={suggestions}
+                onDisconnectRepo={handleDisconnectRepo}
+                onApplySuggestion={handleApplySuggestion}
+                onDismissSuggestion={handleDismissSuggestion}
+                onSignOut={handleSignOut}
+              />
             )}
           </>
         )}
@@ -512,6 +692,16 @@ export default function DashboardPage() {
         onClose={() => setSelectedService(null)}
         service={selectedService}
         repoFullName={selectedRepo?.full_name}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        repoName={selectedRepo?.full_name || ''}
+        shareUrl={shareUrl}
+        onGenerateLink={handleGenerateShareLink}
+        onRevokeLink={handleRevokeShareLink}
       />
     </div>
   )

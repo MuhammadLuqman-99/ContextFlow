@@ -4,6 +4,7 @@ import { Hero } from '@/components/landing/Hero';
 import { ProblemSection } from '@/components/landing/ProblemSection';
 import { HowItWorks } from '@/components/landing/HowItWorks';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
+import { PricingSection } from '@/components/landing/PricingSection';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
 
@@ -15,6 +16,7 @@ export default function LandingPage() {
       <ProblemSection />
       <HowItWorks />
       <FeatureGrid />
+      <PricingSection />
       <CTA />
       <Footer />
     </main>

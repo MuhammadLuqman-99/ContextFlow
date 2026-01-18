@@ -2,17 +2,53 @@
 
 import { Microservice } from '@/types/database'
 import { StatusIndicator, HealthBadge } from '@/components/health/StatusIndicator'
-import { CheckCircle2, Circle, Clock } from 'lucide-react'
+import { Circle, Clock, GripVertical } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 
 interface CardProps {
   microservice: Microservice & {
     pending_suggestions?: number
   }
   onClick?: () => void
+  isDragging?: boolean
 }
 
-export function Card({ microservice, onClick }: CardProps) {
+// Draggable wrapper for Card
+export function DraggableCard({ microservice, onClick }: CardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: microservice.id,
+  })
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+  } : undefined
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'touch-none',
+        isDragging && 'opacity-50'
+      )}
+    >
+      <Card
+        microservice={microservice}
+        onClick={onClick}
+        isDragging={isDragging}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  )
+}
+
+interface CardInnerProps extends CardProps {
+  dragHandleProps?: Record<string, unknown>
+}
+
+export function Card({ microservice, onClick, isDragging, dragHandleProps }: CardInnerProps) {
   const progressColor = () => {
     if (microservice.progress === 100) return 'bg-status-healthy'
     if (microservice.progress >= 50) return 'bg-primary-500'
@@ -26,7 +62,8 @@ export function Card({ microservice, onClick }: CardProps) {
     <div
       className={clsx(
         'kanban-card group relative',
-        onClick && 'cursor-pointer'
+        onClick && 'cursor-pointer',
+        isDragging && 'shadow-lg ring-2 ring-primary-500'
       )}
       onClick={onClick}
     >
@@ -37,11 +74,22 @@ export function Card({ microservice, onClick }: CardProps) {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header with Drag Handle */}
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-          {microservice.service_name}
-        </h3>
+        <div className="flex items-center gap-2">
+          {/* Drag Handle */}
+          {dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            >
+              <GripVertical size={16} />
+            </div>
+          )}
+          <h3 className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+            {microservice.service_name}
+          </h3>
+        </div>
         <StatusIndicator
           status={microservice.health_status}
           showLabel={false}

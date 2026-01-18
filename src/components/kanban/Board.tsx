@@ -3,18 +3,32 @@
 import { Microservice, GeneratedTask, KanbanItem } from '@/types/database'
 import { ServiceStatus } from '@/types/vibe-manifest'
 import { Column } from './Column'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+} from '@dnd-kit/core'
+import { Card } from './Card'
 
 interface BoardProps {
   microservices: Array<Microservice & { pending_suggestions?: number }>
   onCardClick?: (microservice: Microservice) => void
   onPromoteTask?: (task: GeneratedTask) => void
   onDismissTask?: (task: GeneratedTask) => void
+  onStatusChange?: (microserviceId: string, newStatus: ServiceStatus) => Promise<void>
 }
 
 /**
  * Extract next steps from Done microservices and create generated tasks
- * These will appear in the Backlog column as suggestions for next work
+ * These will appear in the In Progress column as next work items
  */
 function extractGeneratedTasks(
   microservices: Array<Microservice & { pending_suggestions?: number }>
@@ -35,7 +49,7 @@ function extractGeneratedTasks(
         source_service_name: ms.service_name,
         source_manifest_path: ms.manifest_path,
         step_index: index,
-        status: 'Backlog',
+        status: 'In Progress',
         is_generated: true,
         created_from_status: 'Done',
       })
@@ -45,7 +59,25 @@ function extractGeneratedTasks(
   return generatedTasks
 }
 
-export function Board({ microservices, onCardClick, onPromoteTask, onDismissTask }: BoardProps) {
+// Type guard to check if item is a generated task
+function isGeneratedTask(item: KanbanItem): item is GeneratedTask {
+  return 'is_generated' in item && item.is_generated === true
+}
+
+export function Board({ microservices, onCardClick, onPromoteTask, onDismissTask, onStatusChange }: BoardProps) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+
+  // Sensors for drag detection
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor)
+  )
+
   // Generate tasks from Done services' next_steps
   const generatedTasks = useMemo(
     () => extractGeneratedTasks(microservices),
@@ -66,8 +98,8 @@ export function Board({ microservices, onCardClick, onPromoteTask, onDismissTask
       groups[ms.status].push(ms)
     }
 
-    // Add generated tasks to Backlog
-    groups.Backlog.push(...generatedTasks)
+    // Add generated tasks to In Progress column
+    groups['In Progress'].push(...generatedTasks)
 
     return groups
   }, [microservices, generatedTasks])
@@ -79,20 +111,89 @@ export function Board({ microservices, onCardClick, onPromoteTask, onDismissTask
     { title: 'Done', status: 'Done' },
   ]
 
+  // Find the active item being dragged
+  const activeItem = useMemo(() => {
+    if (!activeId) return null
+    const ms = microservices.find(m => m.id === activeId)
+    if (ms) return ms
+    return null
+  }, [activeId, microservices])
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event
+    setOverId(over?.id as string || null)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    setActiveId(null)
+    setOverId(null)
+
+    if (!over) return
+
+    const activeItemId = active.id as string
+    const targetStatus = over.id as ServiceStatus
+
+    // Validate it's a valid status
+    const validStatuses: ServiceStatus[] = ['Backlog', 'In Progress', 'Testing', 'Done']
+    if (!validStatuses.includes(targetStatus)) return
+
+    // Find the dragged item
+    const draggedItem = microservices.find(m => m.id === activeItemId)
+    if (!draggedItem) return
+
+    // Skip if same column
+    if (draggedItem.status === targetStatus) return
+
+    // Call the status change handler
+    if (onStatusChange) {
+      await onStatusChange(activeItemId, targetStatus)
+    }
+  }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+    setOverId(null)
+  }
+
   return (
-    <div className="flex gap-4 pb-4">
-      {columns.map((column) => (
-        <Column
-          key={column.status}
-          title={column.title}
-          status={column.status}
-          items={groupedItems[column.status]}
-          onCardClick={onCardClick}
-          onPromoteTask={onPromoteTask}
-          onDismissTask={onDismissTask}
-        />
-      ))}
-    </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="flex gap-4 pb-4">
+        {columns.map((column) => (
+          <Column
+            key={column.status}
+            title={column.title}
+            status={column.status}
+            items={groupedItems[column.status]}
+            onCardClick={onCardClick}
+            onPromoteTask={onPromoteTask}
+            onDismissTask={onDismissTask}
+            isOver={overId === column.status}
+          />
+        ))}
+      </div>
+
+      {/* Drag Overlay - shows the card being dragged */}
+      <DragOverlay>
+        {activeItem && !isGeneratedTask(activeItem) ? (
+          <div className="opacity-90 rotate-3 scale-105">
+            <Card microservice={activeItem} />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   )
 }
 

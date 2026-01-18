@@ -2,9 +2,10 @@
 
 import { Microservice, GeneratedTask, KanbanItem } from '@/types/database'
 import { ServiceStatus } from '@/types/vibe-manifest'
-import { Card, EmptyCard } from './Card'
+import { DraggableCard, EmptyCard } from './Card'
 import { NextStepCard } from './NextStepCard'
 import { clsx } from 'clsx'
+import { useDroppable } from '@dnd-kit/core'
 
 // Type guard to check if item is a generated task
 function isGeneratedTask(item: KanbanItem): item is GeneratedTask {
@@ -18,9 +19,13 @@ interface ColumnProps {
   onCardClick?: (microservice: Microservice) => void
   onPromoteTask?: (task: GeneratedTask) => void
   onDismissTask?: (task: GeneratedTask) => void
+  isOver?: boolean
 }
 
-export function Column({ title, status, items, onCardClick, onPromoteTask, onDismissTask }: ColumnProps) {
+export function Column({ title, status, items, onCardClick, onPromoteTask, onDismissTask, isOver }: ColumnProps) {
+  const { setNodeRef } = useDroppable({
+    id: status,
+  })
   const statusColors = {
     Backlog: 'bg-slate-500',
     'In Progress': 'bg-primary-500',
@@ -59,16 +64,19 @@ export function Column({ title, status, items, onCardClick, onPromoteTask, onDis
         </div>
       </div>
 
-      {/* Column Content */}
-      <div className="flex-1">
-        <div className="kanban-column">
+      {/* Column Content - Droppable Zone */}
+      <div className="flex-1" ref={setNodeRef}>
+        <div className={clsx(
+          'kanban-column transition-all duration-200',
+          isOver && 'ring-2 ring-primary-500 ring-offset-2 bg-primary-50 dark:bg-primary-900/20'
+        )}>
           {items.length === 0 ? (
             <EmptyCard message={`No services in ${title.toLowerCase()}`} />
           ) : (
             <div className="space-y-3 pb-4">
               {/* Render microservice cards first */}
               {microservices.map((ms) => (
-                <Card
+                <DraggableCard
                   key={ms.id}
                   microservice={ms}
                   onClick={() => onCardClick?.(ms)}

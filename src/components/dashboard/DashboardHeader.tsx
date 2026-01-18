@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Search, Filter, Plus, RefreshCw, Bell, X, Check, Trash2, GitCommit, ChevronDown, GitBranch } from 'lucide-react'
+import { Search, Filter, Plus, RefreshCw, Bell, X, Check, Trash2, GitCommit, ChevronDown, GitBranch, Share2, Download } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Repository } from '@/types/database'
 
@@ -26,6 +26,9 @@ interface DashboardHeaderProps {
   onAddRepo: () => void
   onRefresh: () => void
   onSignOut: () => void
+  onShare?: () => void
+  onExport?: () => void
+  isExporting?: boolean
   isRefreshing?: boolean
   notificationCount?: number
   notifications?: Notification[]
@@ -45,6 +48,9 @@ export function DashboardHeader({
   onAddRepo,
   onRefresh,
   onSignOut,
+  onShare,
+  onExport,
+  isExporting = false,
   isRefreshing = false,
   notificationCount = 0,
   notifications = [],
@@ -231,6 +237,29 @@ export function DashboardHeader({
           >
             <RefreshCw size={18} className={clsx('text-slate-600 dark:text-slate-400', isRefreshing && 'animate-spin')} />
           </button>
+
+          {/* Share Button */}
+          {selectedRepo && onShare && (
+            <button
+              onClick={onShare}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              title="Share Dashboard"
+            >
+              <Share2 size={18} className="text-slate-600 dark:text-slate-400" />
+            </button>
+          )}
+
+          {/* Export Button */}
+          {selectedRepo && onExport && (
+            <button
+              onClick={onExport}
+              disabled={isExporting}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              title="Export to PDF"
+            >
+              <Download size={18} className={clsx('text-slate-600 dark:text-slate-400', isExporting && 'animate-pulse')} />
+            </button>
+          )}
 
           {/* Notifications */}
           <div className="relative" ref={notificationRef}>
