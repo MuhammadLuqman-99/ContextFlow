@@ -5,6 +5,7 @@ import { generateWebhookSecret } from '@/lib/github/webhook'
 import { scanRepositoryForManifests } from '@/lib/github/manifest-reader'
 import { rateLimit, getClientIdentifier, rateLimitConfigs, createRateLimitHeaders } from '@/lib/rate-limit'
 import { getUserFromRequest } from '@/lib/auth/helpers'
+import { canUserAdd, getLimitExceededMessage, getUserUsage } from '@/lib/usage/limits'
 
 /**
  * GET /api/repos
@@ -89,9 +90,16 @@ export async function GET(request: NextRequest) {
     // Get user's connected repositories
     const repositories = await getRepositoriesByUserId(supabase, user.id)
 
+    // Get usage info for the response
+    const usage = await getUserUsage(supabase, user.id)
+
     return NextResponse.json({
       success: true,
       data: repositories,
+      usage: {
+        plan: usage.plan,
+        repositories: usage.repositories,
+      },
     })
   } catch (error) {
     console.error('Error fetching repositories:', error)
@@ -137,6 +145,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      )
+    }
+
+    // Check usage limits before allowing new repo connection
+    const limitCheck = await canUserAdd(supabase, user.id, 'repositories')
+
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Repository limit reached',
+          message: getLimitExceededMessage('repositories', limitCheck.usage.plan),
+          usage: limitCheck.usage,
+          upgradeRequired: limitCheck.upgradeRequired,
+        },
+        { status: 403 }
       )
     }
 
