@@ -61,18 +61,18 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Check if user is admin (you'll need to add is_admin column to users table)
+    // Check if user is admin
     const { data: userData } = await supabase
       .from('users')
       .select('is_admin')
       .eq('id', session.user.id)
       .single();
 
-    // For demo purposes, allow access (in production, check userData.is_admin)
-    // if (!userData?.is_admin) {
-    //   router.push('/dashboard');
-    //   return;
-    // }
+    // Strict admin check - redirect non-admins
+    if (!userData?.is_admin) {
+      router.push('/dashboard');
+      return;
+    }
 
     setIsAdmin(true);
     await Promise.all([loadStats(), loadUsers(1)]);

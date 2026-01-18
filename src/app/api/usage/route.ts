@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getUserUsage, canUserAdd, getLimitExceededMessage, UsageType } from '@/lib/usage/limits';
+import { getUserFromRequest } from '@/lib/auth/helpers';
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -10,18 +11,17 @@ const supabase = createClient(
 // GET /api/usage - Get all usage info for current user
 export async function GET(request: NextRequest) {
   try {
-    // Get user from auth header or session
-    const authHeader = request.headers.get('authorization');
-    const userId = request.headers.get('x-user-id');
+    // Use proper authentication
+    const { user } = await getUserFromRequest(request);
 
-    if (!userId) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const usage = await getUserUsage(supabase, userId);
+    const usage = await getUserUsage(supabaseAdmin, user.id);
 
     return NextResponse.json({
       success: true,
@@ -39,9 +39,10 @@ export async function GET(request: NextRequest) {
 // POST /api/usage/check - Check if user can add a specific resource
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
+    // Use proper authentication
+    const { user } = await getUserFromRequest(request);
 
-    if (!userId) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await canUserAdd(supabase, userId, type);
+    const result = await canUserAdd(supabaseAdmin, user.id, type);
 
     if (!result.allowed) {
       return NextResponse.json({
