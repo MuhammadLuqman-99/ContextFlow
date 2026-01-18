@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { getRepositoriesByUserId, createRepository } from '@/lib/supabase/queries'
 import { createOctokitClient, getRepository, createWebhook, listUserRepositories } from '@/lib/github/octokit'
 import { generateWebhookSecret } from '@/lib/github/webhook'
 import { scanRepositoryForManifests } from '@/lib/github/manifest-reader'
+
+// Helper to get user from request (supports both cookie auth and Authorization header)
+async function getUserFromRequest(request: NextRequest) {
+  // Try Authorization header first
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    )
+    const { data: { user } } = await supabase.auth.getUser(token)
+    return { user, supabase }
+  }
+
+  // Fallback to cookie auth
+  const supabase = createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return { user, supabase }
+}
 
 /**
  * GET /api/repos
@@ -12,10 +34,7 @@ import { scanRepositoryForManifests } from '@/lib/github/manifest-reader'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Get authenticated user
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, supabase } = await getUserFromRequest(request)
 
     if (!user) {
       return NextResponse.json(
@@ -105,10 +124,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Get authenticated user
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, supabase } = await getUserFromRequest(request)
 
     if (!user) {
       return NextResponse.json(

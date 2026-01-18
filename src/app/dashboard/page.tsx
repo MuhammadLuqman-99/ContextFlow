@@ -28,18 +28,32 @@ export default function DashboardPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+
+  // Helper for authenticated API calls
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    })
+  }
 
   useEffect(() => {
     checkAuth()
-    loadRepositories()
   }, [])
 
   useEffect(() => {
-    if (selectedRepo) {
+    if (selectedRepo && accessToken) {
       loadMicroservices(selectedRepo.id)
       loadSuggestions(selectedRepo.id)
     }
-  }, [selectedRepo])
+  }, [selectedRepo, accessToken])
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -48,11 +62,13 @@ export default function DashboardPage() {
       return
     }
     setUser(session.user as User)
+    setAccessToken(session.access_token)
+    loadRepositories()
   }
 
   const loadRepositories = async () => {
     try {
-      const response = await fetch('/api/repos')
+      const response = await authFetch('/api/repos')
       const data = await response.json()
 
       if (data.success) {
@@ -60,6 +76,9 @@ export default function DashboardPage() {
         if (data.data.length > 0 && !selectedRepo) {
           setSelectedRepo(data.data[0])
         }
+      } else if (response.status === 401) {
+        // Session might have expired, try to refresh
+        router.push('/login')
       }
     } catch (error) {
       console.error('Failed to load repositories:', error)
@@ -71,7 +90,7 @@ export default function DashboardPage() {
 
   const loadMicroservices = async (repoId: string) => {
     try {
-      const response = await fetch(`/api/manifests?repoId=${repoId}`)
+      const response = await authFetch(`/api/manifests?repoId=${repoId}`)
       const data = await response.json()
 
       if (data.success) {
@@ -88,7 +107,7 @@ export default function DashboardPage() {
 
   const loadSuggestions = async (repoId: string) => {
     try {
-      const response = await fetch(`/api/suggestions?repoId=${repoId}`)
+      const response = await authFetch(`/api/suggestions?repoId=${repoId}`)
       const data = await response.json()
 
       if (data.success) {
@@ -127,7 +146,7 @@ export default function DashboardPage() {
   }
 
   const handleConnectRepo = async (owner: string, repo: string) => {
-    const response = await fetch('/api/repos', {
+    const response = await authFetch('/api/repos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ owner, repo }),

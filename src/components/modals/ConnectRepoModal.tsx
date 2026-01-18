@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Github, Loader2, Search, Lock, Unlock } from 'lucide-react'
 import { clsx } from 'clsx'
+import { supabase } from '@/lib/supabase/client'
 
 interface GitHubRepo {
   id: number
@@ -37,7 +38,15 @@ export function ConnectRepoModal({ isOpen, onClose, onConnect }: ConnectRepoModa
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/repos?available=true')
+      // Get auth token for the request
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const response = await fetch('/api/repos?available=true', {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      })
       const data = await response.json()
 
       if (data.success) {
