@@ -16,14 +16,17 @@ export const Navbar = () => {
                 </div>
 
                 <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
-                    <Link href="#problem" className="hover:text-white transition-colors">
+                    <Link href="/#problem" className="hover:text-white transition-colors">
                         The Problem
                     </Link>
-                    <Link href="#features" className="hover:text-white transition-colors">
+                    <Link href="/#features" className="hover:text-white transition-colors">
                         Features
                     </Link>
-                    <Link href="#pricing" className="hover:text-white transition-colors">
+                    <Link href="/pricing" className="hover:text-white transition-colors">
                         Pricing
+                    </Link>
+                    <Link href="/demo" className="hover:text-white transition-colors">
+                        Demo
                     </Link>
                 </div>
 

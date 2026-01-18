@@ -160,12 +160,18 @@ export const PricingSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="mt-16 text-center"
+          className="mt-16 text-center space-y-4"
         >
           <p className="text-gray-400">
             All plans include a 14-day free trial. No credit card required.{' '}
             <Link href="/login" className="text-neon-purple hover:text-neon-blue transition-colors">
               Start your trial today →
+            </Link>
+          </p>
+          <p className="text-gray-500 text-sm">
+            Need more details?{' '}
+            <Link href="/pricing" className="text-neon-purple hover:text-neon-blue transition-colors">
+              View full feature comparison & usage limits →
             </Link>
           </p>
         </motion.div>
